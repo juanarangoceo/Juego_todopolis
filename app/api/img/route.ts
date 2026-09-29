@@ -10,6 +10,23 @@ import { type NextRequest } from 'next/server'
 const ALLOWED_HOSTS = new Set(['cdn.sanity.io', 'cdn.bemaster.com'])
 const MAX_BYTES = 8 * 1024 * 1024
 
+/**
+ * Tipo real de la imagen según sus primeros bytes. El CDN de Mastershop no
+ * siempre manda `Content-Type: image/*` (a veces octet-stream), así que no
+ * basta con la cabecera; y aceptar cualquier cosa convertiría esto en un
+ * proxy de archivos arbitrarios.
+ */
+function sniffImageType(buf: ArrayBuffer): string | null {
+  const b = new Uint8Array(buf.slice(0, 12))
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg'
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png'
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'image/gif'
+  const ascii = String.fromCharCode(...b)
+  if (ascii.startsWith('RIFF') && ascii.slice(8, 12) === 'WEBP') return 'image/webp'
+  if (ascii.slice(4, 12) === 'ftypavif') return 'image/avif'
+  return null
+}
+
 function mockSvg(spec: string): Response {
   const [, hue = '300', ...rest] = spec.split(':')
   const label = rest.join(':').replace(/[<>&"]/g, '')
@@ -45,10 +62,10 @@ export async function GET(req: NextRequest) {
 
   const upstream = await fetch(src, { next: { revalidate: 86400 } }).catch(() => null)
   if (!upstream || !upstream.ok) return new Response('Imagen no disponible', { status: 502 })
-  const type = upstream.headers.get('content-type') ?? ''
-  if (!type.startsWith('image/')) return new Response('No es una imagen', { status: 415 })
   const body = await upstream.arrayBuffer()
   if (body.byteLength > MAX_BYTES) return new Response('Imagen demasiado grande', { status: 413 })
+  const type = sniffImageType(body)
+  if (!type) return new Response('No es una imagen', { status: 415 })
 
   return new Response(body, {
     headers: {
