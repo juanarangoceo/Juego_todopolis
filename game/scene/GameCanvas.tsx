@@ -1,17 +1,16 @@
 'use client'
 
-import { Suspense, useEffect, useMemo } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
-import { Stars } from '@react-three/drei'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Physics } from '@react-three/rapier'
-import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
+import * as THREE from 'three'
 import { City } from './City'
 import { Traffic, Pedestrians } from './Traffic'
 import { Vehicles } from './Vehicles'
 import { PlayerRig } from './PlayerRig'
 import { Interior } from './Interior'
 import { SPAWN, STORES } from '../lib/city'
-import { bindDesktopInput, releasePointer } from '../lib/input'
+import { bindDesktopInput, player, releasePointer } from '../lib/input'
 import { isUiBlocking, useGame } from '../lib/store'
 
 function InputBinder() {
@@ -54,22 +53,45 @@ function InputBinder() {
   return null
 }
 
-function CityScene() {
+/** Sol de la tarde: la sombra se calcula solo alrededor del jugador. */
+function Sun({ shadows }: { shadows: boolean }) {
+  const light = useRef<THREE.DirectionalLight>(null)
+  useFrame(() => {
+    const l = light.current
+    if (!l) return
+    l.position.set(player.x + 40, 70, player.z + 25)
+    l.target.position.set(player.x, 0, player.z)
+    l.target.updateMatrixWorld()
+  })
+  return (
+    <directionalLight
+      ref={light}
+      intensity={2.1}
+      color="#fff1d6"
+      castShadow={shadows}
+      shadow-mapSize={[2048, 2048]}
+      shadow-camera-left={-55}
+      shadow-camera-right={55}
+      shadow-camera-top={55}
+      shadow-camera-bottom={-55}
+      shadow-camera-near={10}
+      shadow-camera-far={180}
+      shadow-bias={-0.0006}
+      shadow-normalBias={0.04}
+    />
+  )
+}
+
+function CityScene({ shadows }: { shadows: boolean }) {
   const returnTo = useGame((s) => s.returnTo)
   const spawn = useMemo(() => returnTo ?? { x: SPAWN[0], z: SPAWN[2], yaw: 0 }, [returnTo])
   return (
     <>
-      <color attach="background" args={['#070514']} />
-      <fog attach="fog" args={['#0c0820', 60, 330]} />
-      <Stars radius={500} depth={60} count={2500} factor={6} fade speed={0.5} />
-      <ambientLight intensity={0.35} />
-      <hemisphereLight args={['#7a6cff', '#1a0f2e', 0.55]} />
-      <directionalLight position={[-120, 200, 80]} intensity={0.55} color="#b9c4ff" />
-      {/* luna */}
-      <mesh position={[-300, 260, -500]}>
-        <sphereGeometry args={[26, 24, 24]} />
-        <meshBasicMaterial color="#fff4d6" toneMapped={false} />
-      </mesh>
+      <color attach="background" args={['#bfe3fb']} />
+      <fog attach="fog" args={['#cfeafc', 140, 460]} />
+      <hemisphereLight args={['#dff1ff', '#8a7a5c', 1.15]} />
+      <ambientLight intensity={0.25} />
+      <Sun shadows={shadows} />
       <Physics gravity={[0, -20, 0]} timeStep="vary">
         <City />
         <Vehicles />
@@ -86,8 +108,7 @@ function InteriorScene({ storeId }: { storeId: string }) {
   if (!store) return null
   return (
     <>
-      <color attach="background" args={['#0b0818']} />
-      <fog attach="fog" args={['#0b0818', 30, 70]} />
+      <color attach="background" args={['#2a1c14']} />
       <Physics gravity={[0, -20, 0]} timeStep="vary">
         <Interior store={store} />
       </Physics>
@@ -100,21 +121,17 @@ export function GameCanvas({ quality }: { quality: 'high' | 'low' }) {
   const storeId = useGame((s) => s.storeId)
   return (
     <Canvas
-      dpr={quality === 'high' ? [1, 1.75] : [0.75, 1.1]}
-      camera={{ fov: 62, near: 0.1, far: 1400, position: [0, 6, 30] }}
-      gl={{ antialias: quality === 'high', powerPreference: 'high-performance' }}
+      flat
+      shadows={quality === 'high' ? 'soft' : false}
+      dpr={quality === 'high' ? [1, 1.75] : [0.8, 1.25]}
+      camera={{ fov: 34, near: 0.5, far: 2400, position: [0, 30, 40] }}
+      gl={{ antialias: true, powerPreference: 'high-performance' }}
       style={{ position: 'fixed', inset: 0, touchAction: 'none' }}
     >
       <InputBinder />
       <Suspense fallback={null}>
-        {mode === 'interior' && storeId ? <InteriorScene key={storeId} storeId={storeId} /> : <CityScene key="city" />}
+        {mode === 'interior' && storeId ? <InteriorScene key={storeId} storeId={storeId} /> : <CityScene key="city" shadows={quality === 'high'} />}
       </Suspense>
-      {quality === 'high' && (
-        <EffectComposer multisampling={0}>
-          <Bloom intensity={0.9} luminanceThreshold={0.62} luminanceSmoothing={0.2} mipmapBlur />
-          <Vignette eskil={false} offset={0.2} darkness={0.7} />
-        </EffectComposer>
-      )}
     </Canvas>
   )
 }

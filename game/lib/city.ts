@@ -19,20 +19,26 @@ export interface District {
   id: DistrictId
   name: string
   tagline: string
+  /** Color de marca del distrito (interfaz, toldos, banderines). */
   color: string
-  /** Altura base de los edificios de relleno: el centro financiero es alto, los barrios bajos. */
+  /** Tejas y muros de las casas del distrito. */
+  roofs: string[]
+  walls: string[]
+  /** Altura de las casas: de 2 a 4 pisos según el barrio. */
   towerHeight: [number, number]
 }
 
+const CREAM = ['#f3e6c8', '#efdcb5', '#f6ecd9', '#e9d3a8']
+
 export const DISTRICTS: Record<DistrictId, District> = {
-  plaza: { id: 'plaza', name: 'Plaza Todópolis', tagline: 'El centro de la ciudad', color: '#ffd84a', towerHeight: [30, 60] },
-  pasarela: { id: 'pasarela', name: 'Pasarela Neón', tagline: 'Ropa, fajas, calzado y accesorios', color: '#ff4fd8', towerHeight: [24, 55] },
-  tech: { id: 'tech', name: 'Tech Tower', tagline: 'Tecnología y motor', color: '#35e0ff', towerHeight: [50, 110] },
-  glow: { id: 'glow', name: 'Boulevard Glow', tagline: 'Belleza y bienestar', color: '#c28bff', towerHeight: [22, 50] },
-  arena: { id: 'arena', name: 'Arena Pulse', tagline: 'Deportes', color: '#7dff6a', towerHeight: [18, 40] },
-  kids: { id: 'kids', name: 'Kids & Pets Park', tagline: 'Juguetes, bebés y mascotas', color: '#5cf2c2', towerHeight: [12, 26] },
-  casa: { id: 'casa', name: 'Casa Nube', tagline: 'Hogar y cocina', color: '#ffa04d', towerHeight: [16, 38] },
-  rojo: { id: 'rojo', name: 'Distrito Rojo', tagline: 'Lencería y vida nocturna · +18', color: '#ff2d55', towerHeight: [20, 48] },
+  plaza: { id: 'plaza', name: 'Plaza Todópolis', tagline: 'El centro de la ciudad', color: '#f5b73b', roofs: ['#c0563b', '#a8452f'], walls: CREAM, towerHeight: [10, 14] },
+  pasarela: { id: 'pasarela', name: 'Pasarela Neón', tagline: 'Ropa, fajas, calzado y accesorios', color: '#e8559a', roofs: ['#b83b6e', '#d0567f', '#8e3a5c'], walls: ['#f8e1e7', '#f3e6c8', '#fbeff1'], towerHeight: [8, 13] },
+  tech: { id: 'tech', name: 'Tech Tower', tagline: 'Tecnología y motor', color: '#2d9fd6', roofs: ['#3f6f96', '#2f5878', '#4d7fa8'], walls: ['#e3ebf1', '#d6e2ea', '#efe9dc'], towerHeight: [11, 16] },
+  glow: { id: 'glow', name: 'Boulevard Glow', tagline: 'Belleza y bienestar', color: '#9b6bd6', roofs: ['#7a58b0', '#6a4a9c', '#9573c9'], walls: ['#efe6f7', '#f4ecdf', '#e8dcf2'], towerHeight: [8, 12] },
+  arena: { id: 'arena', name: 'Arena Pulse', tagline: 'Deportes', color: '#4cae4c', roofs: ['#3f8a3f', '#5a9e44', '#2f7a4a'], walls: CREAM, towerHeight: [7, 11] },
+  kids: { id: 'kids', name: 'Kids & Pets Park', tagline: 'Juguetes, bebés y mascotas', color: '#2fbfa0', roofs: ['#e0a13a', '#3fb3a0', '#e46b4f'], walls: ['#fdf1d6', '#e7f5ef', '#fbe7d3'], towerHeight: [6, 9] },
+  casa: { id: 'casa', name: 'Casa Nube', tagline: 'Hogar y cocina', color: '#e98b3a', roofs: ['#c0563b', '#b8683a', '#9c4a2f'], walls: CREAM, towerHeight: [7, 11] },
+  rojo: { id: 'rojo', name: 'Distrito Rojo', tagline: 'Lencería y vida nocturna · +18', color: '#d6334f', roofs: ['#7e2335', '#9c2e40', '#5e1e2c'], walls: ['#f1dccf', '#e8d0c0', '#f5e3d3'], towerHeight: [8, 12] },
 }
 
 // Filas de norte (j=0) a sur (j=6); columnas de oeste (i=0) a este (i=6).
@@ -186,7 +192,11 @@ export interface Tower {
   w: number
   d: number
   h: number
-  color: string
+  wall: string
+  roof: string
+  /** Eje de la cumbrera del techo: a lo largo de x o de z. */
+  ridgeX: boolean
+  chimney: boolean
   district: DistrictId
 }
 
@@ -198,6 +208,8 @@ export const TOWERS: Tower[] = (() => {
     const d = DISTRICTS[lot.district]
     const [hMin, hMax] = d.towerHeight
     const h = () => hMin + r() * (hMax - hMin)
+    const pick = <T,>(a: T[]) => a[Math.floor(r() * a.length)]
+    const style = () => ({ wall: pick(d.walls), roof: pick(d.roofs), chimney: r() < 0.55 })
     if (lot.type === 'towers') {
       // 2×2 torres con callejón entre ellas.
       const half = inner / 4
@@ -205,7 +217,7 @@ export const TOWERS: Tower[] = (() => {
         if (r() < 0.12) continue
         const w = half * 2 - 3 - r() * 3
         const dd = half * 2 - 3 - r() * 3
-        out.push({ x: lot.x + ox * half, z: lot.z + oz * half, w, d: dd, h: h(), color: d.color, district: lot.district })
+        out.push({ x: lot.x + ox * half, z: lot.z + oz * half, w, d: dd, h: h(), ridgeX: w >= dd, ...style(), district: lot.district })
       }
     } else if (lot.type === 'store' && lot.store) {
       // Una torre detrás del local.
@@ -219,8 +231,9 @@ export const TOWERS: Tower[] = (() => {
         z: lot.z + fz * off,
         w: alongX ? inner - 4 : backDepth,
         d: alongX ? backDepth : inner - 4,
-        h: h() + 10,
-        color: d.color,
+        h: h() + 4,
+        ridgeX: alongX,
+        ...style(),
         district: lot.district,
       })
     }

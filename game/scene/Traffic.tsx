@@ -8,12 +8,13 @@ import { CarModel } from './CarModel'
 import { Avatar } from './Avatar'
 import { BLOCK, CELL, GRID, HALF, ROAD, ROAD_LINES, TRAFFIC_ROADS, rng } from '../lib/city'
 import { player } from '../lib/input'
+import { CHARACTERS, SKIN_TONES, type CharacterLook } from '../lib/characters'
 
 // Tráfico y peatones: dan vida a la ciudad. Los carros van por su carril de
 // punta a punta y reaparecen al otro lado; frenan si el jugador se les pone
 // adelante. Son cinemáticos: empujan pero no se dejan empujar.
 
-const COLORS = ['#ff2d55', '#35e0ff', '#ffd84a', '#c28bff', '#7dff6a', '#ff4fd8', '#ffffff', '#ffa04d']
+const COLORS = ['#e8559a', '#4aa3d8', '#f5b73b', '#9b6bd6', '#4cae4c', '#e46b4f', '#fdf1d6', '#2fbfa0']
 const LIMIT = HALF + ROAD / 2 + 2
 
 interface TrafficCar {
@@ -99,11 +100,8 @@ interface Walker {
   to: number
   t: number
   speed: number
-  color: string
-  skin: string
+  look: CharacterLook
 }
-
-const SKINS = ['#f1c6a8', '#c68e6a', '#8d5a3b', '#e8b894', '#5c3a26']
 
 function Pedestrian({ w }: { w: Walker }) {
   const ref = useRef<THREE.Group>(null)
@@ -130,7 +128,7 @@ function Pedestrian({ w }: { w: Walker }) {
   })
   return (
     <group ref={ref}>
-      <Avatar color={w.color} skin={w.skin} />
+      <Avatar look={w.look} outline={false} />
     </group>
   )
 }
@@ -139,7 +137,7 @@ export function Pedestrians() {
   const walkers = useMemo(() => {
     const r = rng(1234)
     const out: Walker[] = []
-    for (let n = 0; n < 18; n++) {
+    for (let n = 0; n < 12; n++) {
       const axis = r() < 0.5 ? 'x' : 'z'
       const k = Math.floor(r() * ROAD_LINES.length)
       const side = r() < 0.5 ? -1 : 1
@@ -153,8 +151,11 @@ export function Pedestrians() {
         to: center + BLOCK / 2 - 2,
         t: r(),
         speed: 1.1 + r() * 0.8,
-        color: COLORS[n % COLORS.length],
-        skin: SKINS[n % SKINS.length],
+        look: {
+          ...CHARACTERS[n % CHARACTERS.length].look,
+          skin: SKIN_TONES[(n * 3) % SKIN_TONES.length],
+          top: COLORS[(n * 5) % COLORS.length],
+        },
       })
     }
     return out

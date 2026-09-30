@@ -1,47 +1,46 @@
 'use client'
 
-// Carro deportivo de primitivas: carrocería lacada, cabina de vidrio, luces y
-// neón por debajo. El origen está en el suelo, centro del carro; mira a +Z.
+import { Outlines, RoundedBox } from '@react-three/drei'
+import { toon } from './toon'
 
-export function CarModel({ color = '#ff2d55', lightsOn = true }: { color?: string; lightsOn?: boolean }) {
+// Carrito redondeado de caricatura. Origen en el suelo, centro del carro; mira a +Z.
+
+const INK = '#2b1d14'
+
+export function CarModel({ color = '#e8559a' }: { color?: string; lightsOn?: boolean }) {
   return (
     <group>
       {/* carrocería */}
-      <mesh position={[0, 0.55, 0]}>
-        <boxGeometry args={[1.9, 0.55, 4.2]} />
-        <meshPhysicalMaterial color={color} metalness={0.25} roughness={0.3} clearcoat={1} clearcoatRoughness={0.1} emissive={color} emissiveIntensity={0.18} />
-      </mesh>
+      <RoundedBox args={[1.9, 0.85, 4.2]} radius={0.38} smoothness={4} position={[0, 0.72, 0]} material={toon(color)} castShadow>
+        <Outlines thickness={0.05} color={INK} />
+      </RoundedBox>
       {/* cabina */}
-      <mesh position={[0, 1.05, -0.25]}>
-        <boxGeometry args={[1.6, 0.5, 2.1]} />
-        <meshPhysicalMaterial color="#0b0b18" metalness={0.9} roughness={0.05} transparent opacity={0.85} />
+      <mesh position={[0, 1.12, -0.3]} scale={[1, 0.8, 1.3]} material={toon('#bfe6f5')} castShadow>
+        <sphereGeometry args={[0.8, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <Outlines thickness={0.05} color={INK} />
       </mesh>
       {/* ruedas */}
       {[
-        [-0.95, 1.35],
-        [0.95, 1.35],
-        [-0.95, -1.35],
-        [0.95, -1.35],
+        [-0.82, 1.3],
+        [0.82, 1.3],
+        [-0.82, -1.3],
+        [0.82, -1.3],
       ].map(([x, z], i) => (
-        <mesh key={i} position={[x, 0.36, z]} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.36, 0.36, 0.3, 14]} />
-          <meshStandardMaterial color="#111" roughness={0.8} />
+        <mesh key={i} position={[x, 0.36, z]} rotation={[0, 0, Math.PI / 2]} material={toon('#2a2530')}>
+          <cylinderGeometry args={[0.36, 0.36, 0.28, 12]} />
         </mesh>
       ))}
-      {/* faros y stops */}
-      <mesh position={[0, 0.62, 2.11]}>
-        <boxGeometry args={[1.5, 0.12, 0.04]} />
-        <meshBasicMaterial color={lightsOn ? '#fff6d8' : '#666'} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, 0.66, -2.11]}>
-        <boxGeometry args={[1.6, 0.1, 0.04]} />
-        <meshBasicMaterial color="#ff1133" toneMapped={false} />
-      </mesh>
-      {/* neón inferior */}
-      <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[2.3, 4.6]} />
-        <meshBasicMaterial color={color} transparent opacity={0.35} toneMapped={false} depthWrite={false} />
-      </mesh>
+      {/* faros */}
+      {[-0.5, 0.5].map((x) => (
+        <mesh key={x} position={[x, 0.72, 2.12]} material={toon('#fff3b0')}>
+          <sphereGeometry args={[0.17, 10, 8]} />
+        </mesh>
+      ))}
+      {[-0.55, 0.55].map((x) => (
+        <mesh key={x} position={[x, 0.75, -2.1]} material={toon('#ff4d4d')}>
+          <boxGeometry args={[0.3, 0.16, 0.08]} />
+        </mesh>
+      ))}
     </group>
   )
 }

@@ -18,7 +18,32 @@ export const keys = {
 export const stick = { x: 0, y: 0, active: false }
 
 /** Cámara: yaw (giro) y pitch (inclinación) en radianes. */
-export const look = { yaw: Math.PI, pitch: 0.28, distance: 6.5 }
+export const look = { yaw: Math.PI, pitch: 0.28, distance: 6.5, isoDistance: 24 }
+
+/** Cámara actual: isométrica (clic para caminar) o tercera persona. */
+export const cameraState = { mode: 'iso' as 'iso' | 'third' }
+
+/** Destino de «clic para caminar» y qué hacer al llegar. */
+export const clickTarget: { x: number; z: number; active: boolean; onArrive: (() => void) | null; radius: number } = {
+  x: 0,
+  z: 0,
+  active: false,
+  onArrive: null,
+  radius: 0.5,
+}
+
+export function walkTo(x: number, z: number, onArrive: (() => void) | null = null, radius = 0.5) {
+  clickTarget.x = x
+  clickTarget.z = z
+  clickTarget.active = true
+  clickTarget.onArrive = onArrive
+  clickTarget.radius = radius
+}
+
+export function cancelWalk() {
+  clickTarget.active = false
+  clickTarget.onArrive = null
+}
 
 type ActionName = 'interact' | 'car'
 const actionListeners = new Set<(a: ActionName) => void>()
@@ -67,6 +92,7 @@ export function bindDesktopInput(
     if (blocked()) return
     const k = KEYMAP[e.code]
     if (k) {
+      if (k !== 'run' && k !== 'jump') cancelWalk()
       keys[k] = true
       if (k === 'jump') keys.brake = true
       e.preventDefault()
@@ -85,14 +111,21 @@ export function bindDesktopInput(
 
   // Mirar con el ratón: con el puntero capturado (clic en el juego) o
   // arrastrando con el botón presionado si el navegador no deja capturarlo.
+  // En la cámara isométrica el clic izquierdo es para caminar: se gira la
+  // cámara arrastrando con el botón derecho (o el central).
   let dragging = false
   const mouseDown = (e: MouseEvent) => {
     if (blocked()) return
+    if (cameraState.mode === 'iso') {
+      dragging = e.button !== 0
+      return
+    }
     dragging = true
     if (e.button === 0 && document.pointerLockElement !== canvas) {
       canvas.requestPointerLock?.()?.catch?.(() => {})
     }
   }
+  const contextMenu = (e: MouseEvent) => e.preventDefault()
   const mouseUp = () => {
     dragging = false
   }
@@ -100,12 +133,13 @@ export function bindDesktopInput(
     if (blocked()) return
     if (document.pointerLockElement === canvas || dragging) {
       look.yaw -= e.movementX * 0.0032
-      look.pitch = Math.min(1.1, Math.max(-0.35, look.pitch + e.movementY * 0.0026))
+      if (cameraState.mode === 'third') look.pitch = Math.min(1.1, Math.max(-0.35, look.pitch + e.movementY * 0.0026))
     }
   }
   const wheel = (e: WheelEvent) => {
     if (blocked()) return
-    look.distance = Math.min(14, Math.max(3.5, look.distance + e.deltaY * 0.004))
+    if (cameraState.mode === 'iso') look.isoDistance = Math.min(60, Math.max(14, look.isoDistance + e.deltaY * 0.02))
+    else look.distance = Math.min(14, Math.max(3.5, look.distance + e.deltaY * 0.004))
   }
 
   window.addEventListener('keydown', down)
@@ -115,7 +149,9 @@ export function bindDesktopInput(
   window.addEventListener('mouseup', mouseUp)
   window.addEventListener('mousemove', mouseMove)
   canvas.addEventListener('wheel', wheel, { passive: true })
+  canvas.addEventListener('contextmenu', contextMenu)
   return () => {
+    canvas.removeEventListener('contextmenu', contextMenu)
     window.removeEventListener('keydown', down)
     window.removeEventListener('keyup', up)
     window.removeEventListener('blur', blur)

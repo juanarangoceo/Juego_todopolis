@@ -2,7 +2,8 @@
 
 import { create } from 'zustand'
 import type { CatalogResponse, GameProduct } from '@/lib/catalog-types'
-import { emptyProgress, loadProgress, saveProgress, today, type SavedProgress } from './persist'
+import { emptyProgress, loadPrefs, loadProgress, savePrefs, saveProgress, today, type SavedProgress } from './persist'
+import type { PlayerCharacter } from './characters'
 import { STORES, type DistrictId, type StoreDef } from './city'
 
 export interface Mission {
@@ -44,6 +45,13 @@ interface GameState {
   district: DistrictId
   inCar: boolean
   progress: SavedProgress
+  character: PlayerCharacter | null
+  cameraMode: 'iso' | 'third'
+  /** Calidad gráfica: en baja se quitan sombras y contornos de edificios. */
+  quality: 'high' | 'low'
+  setQuality: (q: 'high' | 'low') => void
+  /** Pantalla de selección de personaje abierta. */
+  choosing: boolean
 
   // Paneles
   product: GameProduct | null
@@ -60,6 +68,9 @@ interface GameState {
   shelfPage: number
 
   start: () => void
+  setCharacter: (c: PlayerCharacter) => void
+  setChoosing: (v: boolean) => void
+  setCameraMode: (m: 'iso' | 'third') => void
   hydrate: () => void
   setCatalog: (c: CatalogResponse | null, error?: boolean) => void
   setPrompt: (p: Prompt | null) => void
@@ -112,6 +123,11 @@ export const useGame = create<GameState>((set, get) => {
     district: 'plaza',
     inCar: false,
     progress: emptyProgress(),
+    character: null,
+    cameraMode: 'iso',
+    quality: 'high',
+    setQuality: (q) => set({ quality: q }),
+    choosing: false,
     product: null,
     checkoutOpen: false,
     advisorOpen: false,
@@ -128,7 +144,19 @@ export const useGame = create<GameState>((set, get) => {
       commit({ ...get().progress, ageConfirmed: true })
       set({ started: true })
     },
-    hydrate: () => set({ progress: loadProgress() }),
+    hydrate: () => {
+      const prefs = loadPrefs()
+      set({ progress: loadProgress(), character: prefs.character, cameraMode: prefs.cameraMode })
+    },
+    setCharacter: (c) => {
+      savePrefs({ character: c, cameraMode: get().cameraMode })
+      set({ character: c, choosing: false })
+    },
+    setChoosing: (v) => set({ choosing: v }),
+    setCameraMode: (m) => {
+      savePrefs({ character: get().character, cameraMode: m })
+      set({ cameraMode: m })
+    },
     setCatalog: (c, error = false) => set({ catalog: c, catalogError: error }),
     setPrompt: (p) => {
       const cur = get().prompt
@@ -192,6 +220,8 @@ export const useGame = create<GameState>((set, get) => {
 export function isUiBlocking(s: GameState): boolean {
   return (
     !s.started ||
+    !s.character ||
+    s.choosing ||
     !!s.product ||
     s.checkoutOpen ||
     s.advisorOpen ||

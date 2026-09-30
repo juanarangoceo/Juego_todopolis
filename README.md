@@ -67,12 +67,26 @@ game/hud/         interfaz: minimapa, mapa y taxi, ficha, checkout, asesor
 
 Para agregar o mover una tienda basta editar `STORES` en `game/lib/city.ts`.
 
+## Estilo y personajes
+
+Arte de caricatura inspirado en los MMORPG isométricos clásicos (diseño propio,
+sin recursos de otros juegos): sombreado en 3 tonos con contornos oscuros
+(`game/scene/toon.ts`), casas con tejas y vigas dibujadas en el shader, calles
+empedradas y personajes chibi (`game/scene/Avatar.tsx`).
+
+Seis personajes para escoger en `game/lib/characters.ts` (colores, peinado y
+accesorio), más tono de piel y nombre. La elección se guarda en el navegador.
+
+Dos cámaras: **vista clásica** (isométrica, clic para caminar; las casas que tapan
+al personaje se vuelven transparentes) y **tercera persona**.
+
 ## Controles
 
-W A S D para moverse, Shift corre, Espacio salta (y frena en el carro), el ratón
-mira, E interactúa, F sube o baja del carro, M abre el mapa con taxi. En el
-celular: joystick a la izquierda, deslizar a la derecha para mirar, y botones de
-acción.
+Clic en el suelo para caminar, en una tienda para entrar y en un producto para
+verlo; clic derecho y arrastrar gira la cámara. También W A S D, Shift corre,
+Espacio salta (y frena en el carro), E interactúa, F sube o baja del carro, M
+abre el mapa con taxi. En el celular: tocar el suelo o usar el joystick, y
+botones para girar la cámara.
 
 ## Pruebas
 

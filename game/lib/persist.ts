@@ -49,3 +49,30 @@ export function saveProgress(p: SavedProgress): void {
     /* sin almacenamiento: el progreso dura lo que dure la pestaña */
   }
 }
+
+// ── Preferencias: personaje y cámara ────────────────────────────────────────
+
+const PREFS_KEY = 'todopolis-prefs-v1'
+
+export interface Prefs {
+  character: { id: string; name: string; skin: string } | null
+  cameraMode: 'iso' | 'third'
+}
+
+export function loadPrefs(): Prefs {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY)
+    if (raw) return { character: null, cameraMode: 'iso', ...JSON.parse(raw) }
+  } catch {
+    /* sin almacenamiento */
+  }
+  return { character: null, cameraMode: 'iso' }
+}
+
+export function savePrefs(p: Prefs): void {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(p))
+  } catch {
+    /* sin almacenamiento */
+  }
+}

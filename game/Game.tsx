@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { useGame } from './lib/store'
 import { Hud } from './hud/Hud'
 import { Welcome } from './hud/Welcome'
+import { CharacterSelect } from './hud/CharacterSelect'
 import type { CatalogResponse } from '@/lib/catalog-types'
 
 // El lienzo 3D solo existe en el navegador (WebGL + WASM de Rapier).
@@ -29,11 +30,15 @@ export function Game() {
   const setCatalog = useGame((s) => s.setCatalog)
   const catalog = useGame((s) => s.catalog)
   const catalogError = useGame((s) => s.catalogError)
+  const character = useGame((s) => s.character)
+  const choosing = useGame((s) => s.choosing)
   const [quality, setQuality] = useState<'high' | 'low' | null>(null)
 
   useEffect(() => {
     hydrate()
-    setQuality(pickQuality())
+    const q = pickQuality()
+    setQuality(q)
+    useGame.getState().setQuality(q)
     let alive = true
     fetch('/api/catalog')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
@@ -47,7 +52,8 @@ export function Game() {
   return (
     <>
       {quality && <GameCanvas quality={quality} />}
-      {started && <Hud />}
+      {started && character && <Hud />}
+      {started && (!character || choosing) && <CharacterSelect />}
       {!started && <Welcome ready={!!quality && (!!catalog || catalogError)} />}
     </>
   )

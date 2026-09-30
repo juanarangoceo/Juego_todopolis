@@ -68,6 +68,10 @@ export function Hud() {
   const blocking = useGame(isUiBlocking)
   const setMap = useGame((s) => s.setMap)
   const setHelp = useGame((s) => s.setHelp)
+  const cameraMode = useGame((s) => s.cameraMode)
+  const setCameraMode = useGame((s) => s.setCameraMode)
+  const setChoosing = useGame((s) => s.setChoosing)
+  const character = useGame((s) => s.character)
   const [missionsOpen, setMissionsOpen] = useState(false)
   const store = mode === 'interior' ? currentStore() : null
   const place = store ? { name: store.name, color: DISTRICTS[store.district].color } : { name: DISTRICTS[district].name, color: DISTRICTS[district].color }
@@ -77,7 +81,7 @@ export function Hud() {
       <div className="hud">
         <div className="topbar">
           <div className="left">
-            <div className="pill glass logo">TODÓPOLIS</div>
+            <div className="pill glass logo hide-mobile">TODÓPOLIS</div>
             <div className="pill glass hide-mobile" style={{ color: place.color }}>
               {place.name}
             </div>
@@ -87,6 +91,16 @@ export function Hud() {
               <span className="coin-dot" />
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{coins}</span>
             </div>
+            <button className="btn glass hide-mobile" onClick={() => setChoosing(true)} title="Cambiar personaje">
+              {character?.name ?? 'Personaje'}
+            </button>
+            <button
+              className="btn glass"
+              onClick={() => setCameraMode(cameraMode === 'iso' ? 'third' : 'iso')}
+              title="Cambiar cámara"
+            >
+              {cameraMode === 'iso' ? 'Vista clásica' : '3ª persona'}
+            </button>
             <button className="btn icon-btn glass only-touch" onClick={() => setMissionsOpen((v) => !v)} aria-label="Misiones">
               ★
             </button>

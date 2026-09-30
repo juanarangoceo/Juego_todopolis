@@ -15,6 +15,10 @@ export function HelpPanel() {
           Controles
         </h2>
         <div className="controls-grid" style={{ margin: '8px 0' }}>
+          <span className="kbd">Clic</span>
+          <span>En el suelo para caminar, en una tienda para entrar, en un producto para verlo</span>
+          <span className="kbd">Clic der.</span>
+          <span>Arrastra para girar la cámara (vista clásica)</span>
           <span className="kbd">W A S D</span>
           <span>Moverte (también las flechas)</span>
           <span className="kbd">Shift</span>
@@ -22,7 +26,7 @@ export function HelpPanel() {
           <span className="kbd">Espacio</span>
           <span>Saltar · frenar en el carro</span>
           <span className="kbd">Ratón</span>
-          <span>Mirar · rueda para acercar la cámara</span>
+          <span>Mirar en 3ª persona · rueda para acercar la cámara</span>
           <span className="kbd">E</span>
           <span>Interactuar</span>
           <span className="kbd">F</span>

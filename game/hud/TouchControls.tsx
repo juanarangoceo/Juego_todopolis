@@ -16,12 +16,13 @@ export function TouchControls() {
   const prompt = useGame((s) => s.prompt)
   const inCar = useGame((s) => s.inCar)
   const setMap = useGame((s) => s.setMap)
+  const iso = useGame((s) => s.cameraMode === 'iso')
   const R = 55
 
   return (
     <div className="touch only-touch">
       <div
-        className="stick-zone"
+        className={`stick-zone ${iso ? 'small' : ''}`}
         onPointerDown={(e) => {
           stickId.current = e.pointerId
           ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -62,7 +63,7 @@ export function TouchControls() {
         {base && <div className="stick-base" style={{ left: base.x, top: base.y }} />}
         {knob && <div className="stick-knob" style={{ left: knob.x, top: knob.y }} />}
       </div>
-      <div
+      {!iso && (<div
         className="look-zone"
         onPointerDown={(e) => {
           lookId.current = e.pointerId
@@ -79,8 +80,18 @@ export function TouchControls() {
         }}
         onPointerUp={() => (lookId.current = null)}
         onPointerCancel={() => (lookId.current = null)}
-      />
+      />)}
       <div className="actions">
+        {iso && (
+          <>
+            <button className="glass" onClick={() => (look.yaw += Math.PI / 4)} aria-label="Girar cámara a la izquierda">
+              ⟲
+            </button>
+            <button className="glass" onClick={() => (look.yaw -= Math.PI / 4)} aria-label="Girar cámara a la derecha">
+              ⟳
+            </button>
+          </>
+        )}
         <button className="glass" onClick={() => setMap(true)}>
           MAPA
         </button>

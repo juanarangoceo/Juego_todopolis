@@ -5,7 +5,9 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from '@react-three/rapier'
 import * as THREE from 'three'
 import { Avatar } from './Avatar'
-import { keys, look, onAction, player, stick } from '../lib/input'
+import { cameraState, cancelWalk, clickTarget, keys, look, onAction, player, stick } from '../lib/input'
+import { sharedUniforms, toon } from './toon'
+import { lookFor } from '../lib/characters'
 import { nearestInteractable } from '../lib/interactions'
 import { isUiBlocking, useGame } from '../lib/store'
 import { districtAtPoint } from '../lib/city'
@@ -19,14 +21,18 @@ interface PlayerRigProps {
   spawn: { x: number; z: number; yaw: number }
   /** En interiores no hay carros ni distritos. */
   city?: boolean
-  color?: string
 }
+
+/** Inclinación y apertura de la cámara isométrica (vista desde arriba, en diagonal). */
+const ISO_PITCH = 0.64
+const ISO_FOV = 30
+const THIRD_FOV = 62
 
 const tmpTarget = new THREE.Vector3()
 const tmpCam = new THREE.Vector3()
 const tmpDir = new THREE.Vector3()
 
-export function PlayerRig({ spawn, city = true, color = '#ff4fd8' }: PlayerRigProps) {
+export function PlayerRig({ spawn, city = true }: PlayerRigProps) {
   const body = useRef<RapierRigidBody>(null)
   const avatar = useRef<THREE.Group>(null)
   const speedRef = useRef(0)
@@ -35,10 +41,24 @@ export function PlayerRig({ spawn, city = true, color = '#ff4fd8' }: PlayerRigPr
   const camReady = useRef(false)
   const { camera } = useThree()
   const { world, rapier } = useRapier()
+  const character = useGame((s) => s.character)
+  const cameraMode = useGame((s) => s.cameraMode)
+  const stuck = useRef(0)
+
+  useEffect(() => {
+    cameraState.mode = cameraMode
+    const cam = camera as THREE.PerspectiveCamera
+    cam.fov = cameraMode === 'iso' ? ISO_FOV : THIRD_FOV
+    cam.updateProjectionMatrix()
+    camReady.current = false
+  }, [cameraMode, camera])
+
+  useEffect(() => cancelWalk, [])
 
   // Mirar hacia donde indica el punto de aparición.
   useEffect(() => {
-    look.yaw = spawn.yaw
+    // En isométrica la cámara queda en diagonal, como en los MMORPG clásicos.
+    look.yaw = spawn.yaw + (cameraState.mode === 'iso' ? Math.PI / 4 : 0)
     look.pitch = 0.28
     camReady.current = false
     player.carId = null
@@ -112,7 +132,8 @@ export function PlayerRig({ spawn, city = true, color = '#ff4fd8' }: PlayerRigPr
       if (player.carId) exitCar()
       b.setTranslation({ x: state.teleport.x, y: 1.2, z: state.teleport.z }, true)
       b.setLinvel({ x: 0, y: 0, z: 0 }, true)
-      look.yaw = state.teleport.yaw
+      look.yaw = state.teleport.yaw + (cameraState.mode === 'iso' ? Math.PI / 4 : 0)
+      cancelWalk()
       camReady.current = false
       state.requestTeleport(null)
     }
@@ -154,14 +175,38 @@ export function PlayerRig({ spawn, city = true, color = '#ff4fd8' }: PlayerRigPr
       const len = Math.hypot(ix, iz)
       const mag = Math.min(1, len)
       const running = keys.run || (stick.active && len > 0.92)
-      const speed = (running ? RUN : WALK) * mag
+      let speed = (running ? RUN : WALK) * mag
       let vx = 0
       let vz = 0
+      const here = b.translation()
       if (len > 0.05) {
+        if (clickTarget.active) cancelWalk()
         const nx = ix / len
         const nz = iz / len
         vx = (fwdX * nz + rightX * nx) * speed
         vz = (fwdZ * nz + rightZ * nx) * speed
+      } else if (clickTarget.active && !blocked) {
+        // Clic para caminar: directo al punto; si algo lo frena, se rinde.
+        const dx = clickTarget.x - here.x
+        const dz = clickTarget.z - here.z
+        const dist = Math.hypot(dx, dz)
+        if (dist <= clickTarget.radius) {
+          const arrive = clickTarget.onArrive
+          cancelWalk()
+          arrive?.()
+        } else {
+          speed = dist > 10 ? RUN * 0.85 : WALK * 1.15
+          vx = (dx / dist) * speed
+          vz = (dz / dist) * speed
+          const real = Math.hypot(b.linvel().x, b.linvel().z)
+          stuck.current = real < speed * 0.25 ? stuck.current + dt : 0
+          if (stuck.current > 0.6) {
+            stuck.current = 0
+            cancelWalk()
+          }
+        }
+      }
+      if (Math.abs(vx) + Math.abs(vz) > 0.01) {
         const target = Math.atan2(vx, vz)
         let diff = target - heading.current
         diff = Math.atan2(Math.sin(diff), Math.cos(diff))
@@ -192,20 +237,23 @@ export function PlayerRig({ spawn, city = true, color = '#ff4fd8' }: PlayerRigPr
     player.y = py
     player.z = pz
 
-    // ── Cámara en tercera persona con choque contra edificios ────────────
-    const dist = look.distance + (inCar ? 4 : 0)
+    sharedUniforms.uPlayer.value.set(px, py - 0.9, pz)
+
+    // ── Cámara: isométrica (MMORPG) o tercera persona con choque ─────────
+    const iso = cameraMode === 'iso'
+    const pitch = iso ? ISO_PITCH : look.pitch
+    const dist = iso ? look.isoDistance * (city ? 1 : 0.8) + (inCar ? 8 : 0) : look.distance + (inCar ? 4 : 0)
     tmpTarget.set(px, py + (inCar ? 1.6 : 0.9), pz)
-    tmpDir.set(
-      Math.sin(look.yaw) * Math.cos(look.pitch),
-      Math.sin(look.pitch),
-      Math.cos(look.yaw) * Math.cos(look.pitch)
-    )
+    tmpDir.set(Math.sin(look.yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(look.yaw) * Math.cos(pitch))
     let d = dist
-    const ray = new rapier.Ray(tmpTarget, tmpDir)
-    const hit = world.castRay(ray, dist, true, undefined, undefined, undefined, undefined, (c) =>
-      c.parent()?.isFixed() ?? false
-    )
-    if (hit) d = Math.max(1.2, hit.timeOfImpact - 0.35)
+    if (!iso) {
+      // En isométrica no se acerca: las casas que tapan se recortan en el shader.
+      const ray = new rapier.Ray(tmpTarget, tmpDir)
+      const hit = world.castRay(ray, dist, true, undefined, undefined, undefined, undefined, (c) =>
+        c.parent()?.isFixed() ?? false
+      )
+      if (hit) d = Math.max(1.2, hit.timeOfImpact - 0.35)
+    }
     tmpCam.copy(tmpTarget).addScaledVector(tmpDir, d)
     if (tmpCam.y < 0.4) tmpCam.y = 0.4
     if (!camReady.current) {
@@ -233,6 +281,7 @@ export function PlayerRig({ spawn, city = true, color = '#ff4fd8' }: PlayerRigPr
   })
 
   return (
+    <>
     <RigidBody
       ref={body}
       colliders={false}
@@ -246,10 +295,39 @@ export function PlayerRig({ spawn, city = true, color = '#ff4fd8' }: PlayerRigPr
       <CapsuleCollider args={[0.5, 0.4]} />
       <group ref={avatar} position={[0, -0.9, 0]} visible={true}>
         <PlayerVisibility>
-          <Avatar color={color} speedRef={speedRef} />
+          <Avatar look={lookFor(character)} speedRef={speedRef} />
         </PlayerVisibility>
       </group>
     </RigidBody>
+    <ClickMarker />
+    </>
+  )
+}
+
+/** Anillo en el suelo donde el jugador hizo clic para caminar. */
+function ClickMarker() {
+  const ref = useRef<THREE.Group>(null)
+  useFrame(({ clock }) => {
+    const g = ref.current
+    if (!g) return
+    g.visible = clickTarget.active
+    if (!clickTarget.active) return
+    g.position.set(clickTarget.x, 0.06, clickTarget.z)
+    const s = 1 + Math.sin(clock.elapsedTime * 6) * 0.12
+    g.scale.set(s, 1, s)
+    g.rotation.y = clock.elapsedTime * 1.5
+  })
+  return (
+    <group ref={ref} visible={false}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} material={toon('#f5b73b')}>
+        <ringGeometry args={[0.45, 0.62, 24]} />
+      </mesh>
+      {[0, 1, 2, 3].map((i) => (
+        <mesh key={i} rotation={[-Math.PI / 2, 0, (i * Math.PI) / 2]} position={[Math.cos((i * Math.PI) / 2) * 0.85, 0, -Math.sin((i * Math.PI) / 2) * 0.85]} material={toon('#fff4dc')}>
+          <circleGeometry args={[0.12, 3]} />
+        </mesh>
+      ))}
+    </group>
   )
 }
 

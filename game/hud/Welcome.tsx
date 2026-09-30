@@ -13,10 +13,12 @@ export function Welcome({ ready }: { ready: boolean }) {
         <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 0 }}>Pagas al recibir · Llega en 3 a 7 días hábiles</p>
 
         <div className="controls-grid hide-touch">
+          <span className="kbd">Clic</span>
+          <span>En el suelo para caminar · en una tienda para entrar</span>
           <span className="kbd">W A S D</span>
-          <span>Caminar · Shift para correr · Espacio para saltar</span>
-          <span className="kbd">Ratón</span>
-          <span>Clic en el juego y mueve el ratón para mirar</span>
+          <span>También camina · Shift corre · Espacio salta</span>
+          <span className="kbd">Clic der.</span>
+          <span>Arrastra para girar la cámara · rueda para acercar</span>
           <span className="kbd">E</span>
           <span>Entrar, ver productos, hablar con el asesor</span>
           <span className="kbd">F</span>
@@ -25,10 +27,10 @@ export function Welcome({ ready }: { ready: boolean }) {
           <span>Mapa y taxi a cualquier tienda</span>
         </div>
         <div className="controls-grid only-touch">
+          <span className="kbd">Toca</span>
+          <span>El suelo para caminar o una tienda para entrar</span>
           <span className="kbd">◎</span>
-          <span>Joystick a la izquierda para moverte</span>
-          <span className="kbd">↔</span>
-          <span>Desliza a la derecha para mirar</span>
+          <span>O usa el joystick abajo a la izquierda</span>
           <span className="kbd">E</span>
           <span>Botón de acción para entrar y comprar</span>
         </div>
